@@ -1,0 +1,222 @@
+<!DOCTYPE html><html><head>
+  <title>Superadmin - Reseller Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #ffffff;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    h1, h2 {
+      text-align: center;
+      color: #00c3ff;
+    }
+    .panel {
+      background: #1e1e1e;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+      margin-bottom: 40px;
+    }
+    input, button {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      margin: 10px 0;
+      border-radius: 8px;
+      border: none;
+    }
+    input {
+      background: #333;
+      color: #fff;
+    }
+    button {
+      background: #00c3ff;
+      color: #000;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #00eaff;
+    }
+    .reseller-card {
+      background: #2a2a2a;
+      padding: 20px;
+      margin-bottom: 15px;
+      border-left: 6px solid #00c3ff;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="panel">
+      <h1>Buat Reseller</h1>
+      <input type="text" id="resellerName" placeholder="Nama Reseller">
+      <input type="text" id="resellerEmail" placeholder="Email Reseller">
+      <input type="password" id="resellerPassword" placeholder="Password Reseller">
+      <input type="number" id="resellerCoin" placeholder="Coin (ex: 10)">
+      <button id="resellerButton" onclick="createReseller()">Buat Reseller</button>
+      <div id="resellerStatus"></div>
+    </div><div class="panel">
+  <h2>Daftar Reseller</h2>
+  <div id="resellerList">Memuat...</div>
+</div>
+
+<div class="panel">
+  <h2>Log Reseller</h2>
+  <input type="text" id="logResellerId" placeholder="Reseller ID">
+  <button onclick="lihatLog()">Lihat Log</button>
+  <pre id="logResult"></pre>
+</div>
+
+  </div>  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAFx-6mZJr9ayQ02FuaIUxN2Iq2YtY9PpE",
+      authDomain: "anjai-ef2b8.firebaseapp.com",
+      databaseURL: "https://anjai-ef2b8-default-rtdb.firebaseio.com",
+      projectId: "anjai-ef2b8",
+      storageBucket: "anjai-ef2b8.firebasestorage.app",
+      messagingSenderId: "1017664592279",
+      appId: "1:1017664592279:web:06c9134710acaf75554cd2",
+      measurementId: "G-20YE8KQDMM"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function createReseller() {
+      const name = document.getElementById("resellerName").value.trim();
+      const email = document.getElementById("resellerEmail").value.trim();
+      const password = document.getElementById("resellerPassword").value.trim();
+      const coin = parseInt(document.getElementById("resellerCoin").value.trim()) || 0;
+
+      if (!name || !email || !password || coin <= 0) {
+        alert("Isi semua field dengan benar");
+        return;
+      }
+
+      const uid = Date.now();
+      const data = {
+        name,
+        email,
+        password,
+        coin,
+        uid: uid.toString()
+      };
+
+      db.ref('resellers/' + uid).set(data, function(error) {
+        if (error) {
+          alert("Gagal menambahkan reseller");
+        } else {
+          clearForm();
+          document.getElementById("resellerStatus").innerText = "✅ Reseller berhasil ditambahkan!";
+          document.getElementById("resellerButton").innerText = "Buat Reseller";
+          document.getElementById("resellerButton").setAttribute("onclick", "createReseller()");
+          loadReseller();
+        }
+      });
+    }
+
+    function loadReseller() {
+      const list = document.getElementById("resellerList");
+      list.innerHTML = "Memuat...";
+      db.ref("resellers").once("value", function(snapshot) {
+        const data = snapshot.val();
+        if (!data) return list.innerHTML = "Belum ada reseller.";
+
+        list.innerHTML = "";
+        for (let uid in data) {
+          const r = data[uid];
+          list.innerHTML += `
+            <div class="reseller-card">
+              <strong>${r.name}</strong><br>
+              Email: ${r.email}<br>
+              Coin: ${r.coin}<br>
+              UID: ${r.uid}<br><br>
+              <button onclick="editReseller('${uid}')">Edit</button>
+              <button onclick="deleteReseller('${uid}')">Hapus</button>
+            </div>
+          `;
+        }
+      });
+    }
+
+    function editReseller(uid) {
+      db.ref("resellers/" + uid).once("value", function(snapshot) {
+        const r = snapshot.val();
+        if (!r) return alert("Reseller tidak ditemukan.");
+
+        document.getElementById("resellerName").value = r.name;
+        document.getElementById("resellerEmail").value = r.email;
+        document.getElementById("resellerPassword").value = r.password;
+        document.getElementById("resellerCoin").value = r.coin;
+        document.getElementById("resellerStatus").innerText = "Edit mode aktif. Klik 'Simpan Perubahan' untuk update.";
+
+        document.getElementById("resellerButton").innerText = "Simpan Perubahan";
+        document.getElementById("resellerButton").setAttribute("onclick", `updateReseller('${uid}')`);
+      });
+    }
+
+    function updateReseller(uid) {
+      const name = document.getElementById("resellerName").value.trim();
+      const email = document.getElementById("resellerEmail").value.trim();
+      const password = document.getElementById("resellerPassword").value.trim();
+      const coin = parseInt(document.getElementById("resellerCoin").value.trim()) || 0;
+
+      if (!name || !email || !password || coin < 0) {
+        alert("Isi semua field dengan benar");
+        return;
+      }
+
+      const data = { name, email, password, coin, uid };
+
+      db.ref("resellers/" + uid).set(data, function(error) {
+        if (error) {
+          alert("Gagal menyimpan perubahan");
+        } else {
+          clearForm();
+          document.getElementById("resellerStatus").innerText = "✅ Reseller berhasil diperbarui!";
+          document.getElementById("resellerButton").innerText = "Buat Reseller";
+          document.getElementById("resellerButton").setAttribute("onclick", "createReseller()");
+          loadReseller();
+        }
+      });
+    }
+
+    function deleteReseller(uid) {
+      if (confirm("Yakin ingin menghapus reseller ini?")) {
+        db.ref("resellers/" + uid).remove().then(() => {
+          alert("Reseller dihapus.");
+          loadReseller();
+        });
+      }
+    }
+
+    function clearForm() {
+      document.getElementById("resellerName").value = "";
+      document.getElementById("resellerEmail").value = "";
+      document.getElementById("resellerPassword").value = "";
+      document.getElementById("resellerCoin").value = "";
+    }
+
+    function lihatLog() {
+      const uid = document.getElementById("logResellerId").value.trim();
+      if (!uid) return alert("Masukkan UID reseller");
+
+      db.ref("log_reseller/" + uid).once("value", function(snapshot) {
+        const log = snapshot.val();
+        document.getElementById("logResult").textContent = log ? JSON.stringify(log, null, 2) : "Tidak ada log.";
+      });
+    }
+
+    loadReseller();
+  </script></body>
+</html>
